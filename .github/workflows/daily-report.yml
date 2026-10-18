@@ -35,14 +35,12 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: 生成当日报告（覆盖式）
+      - name: 生成报告（最近 48 小时滚动窗口）
         env:
           TZ: Asia/Shanghai
         run: |
-          TODAY=$(TZ=Asia/Shanghai date +%Y%m%d)
-          echo "生成报告日期：$TODAY"
-          # --date 指定当天；同名文件会被覆盖
-          python 个股利好提取器.py --date "$TODAY"
+          echo "生成最近 48 小时滚动窗口报告"
+          python 个股利好提取器.py --window-hours 48
 
       - name: 构建站点目录
         env:
@@ -58,23 +56,20 @@ jobs:
           # 1) 拷入本次生成的 HTML（覆盖同名文件）
           cp -f "$SRC"/*.html "$SITE"/ 2>/dev/null || true
 
-          # 2) 定位当日主报告（细化报告，排除通达信版面）
+          # 2) 定位本次主报告（滚动模式下文件名按运行当天日期）
           MAIN_HTML=$(ls "$SITE"/${TODAY}_个股利好细化报告*.html 2>/dev/null | head -n1 || true)
           if [ -z "$MAIN_HTML" ]; then
-            echo "错误：未找到当日主报告 ${TODAY}_个股利好细化报告*.html"
+            echo "错误：未找到主报告 ${TODAY}_个股利好细化报告*.html"
             ls -la "$SITE"
             exit 1
           fi
-          echo "当日主报告：$MAIN_HTML"
+          echo "主报告：$MAIN_HTML"
 
-          # 3) latest.html 覆盖为当日主报告
+          # 3) latest / index
           cp -f "$MAIN_HTML" "$SITE/latest.html"
-
-          # 4) index.html = latest.html（根路径返回最新）
           cp -f "$SITE/latest.html" "$SITE/index.html"
 
-          # 5) 清理：只保留当日主报告 + latest + index + 通达信版面
-          #    删除根目录下其他日期的旧报告，避免站点目录膨胀
+          # 4) 清理其他日期的旧报告
           for f in "$SITE"/[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_个股利好细化报告*.html; do
             [ -e "$f" ] || continue
             b=$(basename "$f")
