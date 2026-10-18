@@ -1,0 +1,97 @@
+name: 个股利好报告自动生成与发布
+
+on:
+  schedule:
+    # 每 2 小时运行一次（UTC 偶数点 15 分）
+    # 北京时间对应 08:15 / 10:15 / 12:15 / 14:15 / 16:15 / 18:15 / 20:15 / 22:15 / 00:15 / 02:15 / 04:15 / 06:15
+    - cron: '15 */2 * * *'
+  workflow_dispatch:          # 支持手动触发
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 生成当日报告（覆盖式）
+        env:
+          TZ: Asia/Shanghai
+        run: |
+          TODAY=$(TZ=Asia/Shanghai date +%Y%m%d)
+          echo "生成报告日期：$TODAY"
+          # --date 指定当天；同名文件会被覆盖
+          python 个股利好提取器.py --date "$TODAY"
+
+      - name: 构建站点目录
+        env:
+          TZ: Asia/Shanghai
+        run: |
+          set -e
+          SRC="个股利好报告"
+          SITE="site"
+          mkdir -p "$SITE"
+
+          TODAY=$(TZ=Asia/Shanghai date +%Y%m%d)
+
+          # 1) 拷入本次生成的 HTML（覆盖同名文件）
+          cp -f "$SRC"/*.html "$SITE"/ 2>/dev/null || true
+
+          # 2) 定位当日主报告（细化报告，排除通达信版面）
+          MAIN_HTML=$(ls "$SITE"/${TODAY}_个股利好细化报告*.html 2>/dev/null | head -n1 || true)
+          if [ -z "$MAIN_HTML" ]; then
+            echo "错误：未找到当日主报告 ${TODAY}_个股利好细化报告*.html"
+            ls -la "$SITE"
+            exit 1
+          fi
+          echo "当日主报告：$MAIN_HTML"
+
+          # 3) latest.html 覆盖为当日主报告
+          cp -f "$MAIN_HTML" "$SITE/latest.html"
+
+          # 4) index.html = latest.html（根路径返回最新）
+          cp -f "$SITE/latest.html" "$SITE/index.html"
+
+          # 5) 清理：只保留当日主报告 + latest + index + 通达信版面
+          #    删除根目录下其他日期的旧报告，避免站点目录膨胀
+          for f in "$SITE"/[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_个股利好细化报告*.html; do
+            [ -e "$f" ] || continue
+            b=$(basename "$f")
+            d=${b:0:8}
+            if [ "$d" != "$TODAY" ]; then
+              rm -f "$f"
+            fi
+          done
+
+          echo "站点目录内容："
+          find "$SITE" -maxdepth 1 -type f | sort
+
+      - name: 配置 GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: 上传 Pages 产物
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/
+
+      - name: 部署到 GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
