@@ -3437,6 +3437,7 @@ def main():
     ap = argparse.ArgumentParser(description="个股利好提取器")
     ap.add_argument("--run", action="store_true", help="手动立即提取一次")
     ap.add_argument("--date", type=str, default=None, help="指定数据日期 YYYYMMDD（不填则为近24小时滚动窗口）")
+    ap.add_argument("--window-hours", type=int, default=24, help="滚动窗口小时数（仅默认模式生效，默认 24；传 48 即最近 48 小时）")
     ap.add_argument("--auto", action="store_true", help="常驻模式，每天00:15自动提取前一日")
     ap.add_argument("--install-task", action="store_true", help="注册Windows计划任务(每天00:15)")
     ap.add_argument("--remove-task", action="store_true", help="删除Windows计划任务")
@@ -3516,8 +3517,7 @@ def main():
         run_extract(d, mode="手动")
     else:
         # 未指定日期时用近24小时滚动窗口：凌晨运行时也能出有效报告，而不是交白卷
-        run_extract(datetime.datetime.now(), mode="手动", rolling=True)
-
+        run_extract(datetime.datetime.now(), mode="手动", rolling=True, window_hours=args.window_hours)
 
 if __name__ == "__main__":
     main()
