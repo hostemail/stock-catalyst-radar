@@ -3136,7 +3136,10 @@ def build_html_report(report_date, records, neg_records, top_themes, ok_sources,
 
     p += ["<footer>本报告由程序基于公开财经快讯自动整理，仅供信息参考，不构成任何投资建议。"
           f"<br>生成时间：{gen_time}　·　个股利好提取器 v{VERSION}（利好五级 + 利空三级 + 市场验证）</footer>",
-          "</div>", "<script>" + HTML_SCRIPT + "</script>", "</body>", "</html>"]
+          "</div>", "<script>" + HTML_SCRIPT + "</script>",
+          '<script defer src="https://cloud.umami.is/script.js" '
+          'data-website-id="84d68462-9b2f-4fcb-9ea3-e606d61c9302"></script>',
+          "</body>", "</html>"]
     return "\n".join(p)
 
 
